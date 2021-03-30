@@ -26,7 +26,7 @@ object MatrixGameSolver {
     }
   }
 
-  val analytic: Array[Array[Double]] => Result = matrix => {
+  val analytic: Array[Array[Int]] => Result = matrix => {
     val m = toDenseMatrix(matrix)
     println(s"Analytic game solv:\n$m")
     val mInv = inv(m)
