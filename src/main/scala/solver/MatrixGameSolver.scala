@@ -1,7 +1,9 @@
 package solver
 
-import breeze.linalg.{DenseMatrix, DenseVector, argmax, argmin, inv, max, min}
+import breeze.linalg.{ Axis, DenseMatrix, DenseVector, argmax, argmin, inv, max, min }
+import breeze.numerics.abs
 import scalax.chart.api._
+import solver.Utils.printMatrix
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
@@ -28,19 +30,86 @@ object MatrixGameSolver {
 
   val analytic: Array[Array[Double]] => Result = matrix => {
     val m = toDenseMatrix(matrix)
+    analytic(m)
+  }
+
+  def analytic(m: DenseMatrix[Double]): Result = {
     println(s"Analytic game solv:\n$m")
     val mInv = inv(m)
     println(s"C-1:\n$mInv")
-    val u = DenseVector.ones[Double](m.rows)
-    val v = 1 / (u.t * mInv * u)
+    val u1 = DenseVector.ones[Double](m.rows)
+    val u2 = DenseVector.ones[Double](m.cols)
+    val v = 1 / (u1.t * mInv * u2)
     println(s"V = $v")
-    val x = u.t * mInv * v
-    val y = mInv * u * v
+    val x = u1.t * mInv * v
+    val y = mInv * u2 * v
     Result(x.inner.data, y.data)
   }
 
-  def braunRobinson(m: Array[Array[Double]], eps: Double): Result = {
-    val matrix = toDenseMatrix(m)
+  def monotone(matrix: Array[Array[Double]]): Seq[Double] = {
+    val m = toDenseMatrix(matrix)
+    val eps = 0.001
+
+    @tailrec
+    def step(s: Int, xPrev: DenseVector[Double], cPrev: DenseVector[Double], J: Seq[Int]): Seq[Double] = {
+      val stepMatrix = DenseVector.horzcat(J.map(m(::, _)): _*)
+      println(s"\nNew step $s")
+      println(s"New step matrix:")
+      printMatrix(stepMatrix)
+      val x_  = if(stepMatrix.cols == 1) {
+        val dv = DenseVector.zeros[Double](stepMatrix.rows)
+          dv.update(argmax(stepMatrix(::, 0)), 1)
+        dv
+      } else DenseVector(braunRobinson(stepMatrix, eps).x)
+      val c_ = x_.toScalaVector().zipWithIndex.map{ case (xi, ind) => xi * m(ind, ::).t}.reduce(_ + _)
+      println(s"x_$s = ${x_}\nc_$s = $c_")
+      val m2 = DenseVector.horzcat(c_, cPrev).t
+      val Array(a, a_) = braunRobinson(m2, eps).x
+      println()
+      printMatrix(m2)
+      println(s"a$s = $a\n(1-a$s) = $a_")
+      if (a_  < 0.05) xPrev.toScalaVector()
+      else {
+        val xNew = xPrev * a_ + x_ * a
+        val cNew = cPrev * a_ + c_ * a
+        val minC = min(cNew)
+        val JNew = cNew.iterator.collect{case (ind, v) if abs(v - minC) < 0.01 => ind}.toList
+        println(s"\nStep $s result:\nx$s = $xNew\nc$s = $cNew\nJ$s = $JNew")
+        step(s + 1, xNew, cNew, JNew)
+      }
+    }
+
+    step(1, DenseVector(1, 0, 0), m(0, ::).t, Seq(argmin(m(0, ::))))
+  }
+
+  def removeDominicRows(m: DenseMatrix[Double]):(Seq[Int], DenseMatrix[Double]) = {
+    var remove = Seq.empty[Int]
+    for (i <- 0 until m.rows; j <- 0 until m.rows) {
+      if (i != j) {
+        if (m(i, ::).inner.toScalaVector().zip(m(j, ::).inner.toScalaVector()).forall { case (v1, v2) => v1 > v2 }) {
+          remove = j +: remove
+        }
+      }
+    }
+    (remove.distinct, m.delete(remove.distinct, Axis._0))
+  }
+
+  def removeDominicCols(m: DenseMatrix[Double]):(Seq[Int], DenseMatrix[Double]) = {
+    var remove = Seq.empty[Int]
+    for (i <- 0 until m.cols; j <- 0 until m.cols) {
+      if (i != j) {
+        if (m(::, i).toScalaVector().zip(m(::, j).toScalaVector()).forall { case (v1, v2) => v1 > v2 }) {
+          remove = i +: remove
+        }
+      }
+    }
+    (remove.distinct, m.delete(remove.distinct, Axis._1))
+  }
+
+  def braunRobinson(matrix: Array[Array[Double]], eps: Double): Result =
+    braunRobinson(toDenseMatrix(matrix), eps)
+
+  def braunRobinson(matrix: DenseMatrix[Double], eps: Double): Result = {
     println(s"Solution by method Braun-Robinson")
     val aChoicesCount = Array.fill(matrix.rows)(0)
     val bChoicesCount = Array.fill(matrix.cols)(0)

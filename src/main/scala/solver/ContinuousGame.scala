@@ -1,5 +1,7 @@
 package solver
 
+import solver.Utils.printMatrix
+
 class ContinuousGame(a: Double, b: Double, c: Double, d: Double, e: Double) {
   def h(x: Double, y: Double): Double =
     a * x * x + b * y * y + c * x * y + d * x + e * y
@@ -23,8 +25,5 @@ class ContinuousGame(a: Double, b: Double, c: Double, d: Double, e: Double) {
 
   private def getRes(probability: Array[Double], n: Int): Double =
     probability.zipWithIndex.maxBy(_._1)._2.toDouble / n
-
-  private def printMatrix(arr: Array[Array[Double]]): Unit =
-    println(arr.map(_.map(_.formatted("%3.3f")).mkString(" ")).mkString("\n"))
 
 }
