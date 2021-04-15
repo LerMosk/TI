@@ -28,19 +28,19 @@ object MatrixGameSolver {
     }
   }
 
-  val analytic: Array[Array[Int]] => Result = matrix => {
+  def analytic(matrix: Array[Array[Int]]): Result = {
     val m = toDenseMatrix(matrix)
     analytic(m)
   }
 
-  def analytic(m: DenseMatrix[Double]): Result = {
+  def analytic(m: DenseMatrix[Int]): Result = {
     println(s"Analytic game solv:\n$m")
     val mInv = inv(m)
     println(s"C-1:\n$mInv")
     val u1 = DenseVector.ones[Double](m.rows)
     val u2 = DenseVector.ones[Double](m.cols)
     val v = 1 / (u1.t * mInv * u2)
-    println(s"V = $v")
+    println(f"V = $v%6.3f")
     val x = u1.t * mInv * v
     val y = mInv * u2 * v
     Result(x.inner.data, y.data)
@@ -172,7 +172,7 @@ object MatrixGameSolver {
       println(f"$step%4s x$aChoice y$bChoice${xRowNew.data.map(_.formatted("%7d")).mkString}${yRowNew.data.map(_.formatted("%7d")).mkString} $vMax%6.3f $vMin%6.3f $epsCalc%6.3f")
       epsCalc match {
         case e if e <= eps =>
-          println(s"Result eps = $e")
+          println(f"Result eps = $e%6.3f")
           (Result(aChoicesCount.map(_.toDouble / step), bChoicesCount.map(_.toDouble / step)), expSeq :+ epsCalc)
         case _ =>
           braunRobinsonStep(BrStep(step + 1, xRowNew, yRowNew, vMaxColNew, vMinColNew, expSeq :+ epsCalc))
